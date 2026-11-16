@@ -698,9 +698,9 @@ Future<void> openInBrowser(String file) async {
     final f = File('$dir/$rel');
     if (await f.exists()) {
       r.headers.contentType = ContentType.parse('${mime[p.extension(f.path).toLowerCase().replaceFirst('.', '')] ?? 'application/octet-stream'}; charset=utf-8');
-      await r.addStream(f.openRead());
+      await r.response.addStream(f.openRead());
     } else { r.response.statusCode = 404; }
-    await r.close();
+    await r.response.close();
   });
   await launchUrl(Uri.parse('http://127.0.0.1:${_srv!.port}/${Uri.encodeComponent(p.basename(file))}'), mode: LaunchMode.externalApplication);
 }
