@@ -22,9 +22,8 @@ class S extends ChangeNotifier {
   }
 
   Future<void> loadFont() async {
-    // Default: bundled Disket Mono (declared in pubspec.yaml).
     if (fontPath == null || !File(fontPath!).existsSync()) {
-      fontFamily = 'DisketMono';
+      fontFamily = null;
       return;
     }
     try {
@@ -34,7 +33,7 @@ class S extends ChangeNotifier {
       await l.load();
       fontFamily = fam;
     } catch (_) {
-      fontFamily = 'DisketMono';
+      fontFamily = null;
     }
   }
 

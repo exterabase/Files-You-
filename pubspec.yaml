@@ -31,9 +31,3 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon.png
-  fonts:
-    - family: DisketMono
-      fonts:
-        - asset: assets/fonts/Disket-Mono-Regular.ttf
-        - asset: assets/fonts/Disket-Mono-Bold.ttf
-          weight: 700
