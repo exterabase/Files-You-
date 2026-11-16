@@ -29,7 +29,12 @@ jobs:
           cache: true
 
       - name: Set up Android project
-        run: flutter create --platforms=android --org com.filesyou --project-name files_you .
+        run: |
+          flutter create --platforms=android --org com.filesyou --project-name files_you .
+          sed -i \
+            -e 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' \
+            -e 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' \
+            android/app/build.gradle*
 
       - name: Set up Android NDK
         run: |
@@ -38,7 +43,7 @@ jobs:
           test -n "$sdkmanager_path"
           echo "$(dirname "$sdkmanager_path")" >> "$GITHUB_PATH"
           yes | "$sdkmanager_path" --licenses >/dev/null || true
-          "$sdkmanager_path" "ndk;27.0.12077973"
+          "$sdkmanager_path" "platforms;android-36" "ndk;27.0.12077973"
           echo "ANDROID_NDK_HOME=$sdk_root/ndk/27.0.12077973" >> "$GITHUB_ENV"
 
       - name: Set up Rust
