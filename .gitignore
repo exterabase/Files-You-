@@ -1,0 +1,9 @@
+build/
+.dart_tool/
+.idea/
+rust/target/
+android/
+pubspec.lock
+# Шрифт Disket Mono нельзя распространять (см. README, раздел «Шрифт»)
+assets/fonts/*.ttf
+assets/fonts/*.pdf
