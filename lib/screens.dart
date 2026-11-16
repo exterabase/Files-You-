@@ -830,8 +830,8 @@ class SettingsScreen extends StatelessWidget {
                 icon: const Icon(Icons.font_download_outlined),
                 label: Text(t('font_pick')),
                 onPressed: () async {
-                  final r = await FilePicker.platform.pickFiles(type: FileType.any);
-                  final f = r?.files.single.path;
+                  final files = await FilePicker.pickFiles(type: FileType.any);
+                  final f = files.isEmpty ? null : files.single.path;
                   if (f != null && f.toLowerCase().endsWith('.ttf')) {
                     final dir = await getApplicationSupportDirectory();
                     final dst = '${dir.path}/user_font.ttf';
