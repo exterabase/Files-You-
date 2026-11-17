@@ -15,7 +15,7 @@ Need flutter 'Установите Flutter SDK и добавьте flutter\bin �
 Need cargo   'Установите Rust через rustup (https://rustup.rs).'
 Need rustup  'Установите Rust через rustup (https://rustup.rs).'
 
-foreach ($f in 'assets\fonts\Disket-Mono-Regular.ttf', 'assets\fonts\Disket-Mono-Bold.ttf', 'assets\icon.png') {
+foreach ($f in 'assets\fonts\Disket-Mono-Regular.ttf', 'assets\fonts\Disket-Mono-Bold.ttf', 'assets\icon.png', 'assets\LICENSE.txt') {
     if (-not (Test-Path $f)) { throw "Нет файла $f (см. README, раздел «Шрифт и иконка»)." }
 }
 
@@ -24,18 +24,30 @@ if (-not (Test-Path android)) {
     Run { flutter create --platforms=android --org com.filesyou --project-name files_you . }
 }
 
-# 2. Манифест: доступ ко всем файлам, интернет, http, название
-$m = 'android\app\src\main\AndroidManifest.xml'
-$x = [IO.File]::ReadAllText((Resolve-Path $m))
-if ($x -notmatch 'MANAGE_EXTERNAL_STORAGE') {
-    $perm = '<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>' + "`n    " +
-            '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>' + "`n    " +
-            '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>' + "`n    " +
-            '<uses-permission android:name="android.permission.INTERNET"/>' + "`n    "
-    $x = $x.Replace('<application', $perm + '<application android:usesCleartextTraffic="true"')
-    $x = [regex]::Replace($x, 'android:label="[^"]*"', 'android:label="Files You"', 1)
-    [IO.File]::WriteAllText((Resolve-Path $m), $x, (New-Object Text.UTF8Encoding $false))
+# 2. Манифест (можно запускать повторно, дубли не создаются)
+$m = (Resolve-Path 'android\app\src\main\AndroidManifest.xml').Path
+$x = [IO.File]::ReadAllText($m)
+
+$add = ''
+foreach ($pm in 'MANAGE_EXTERNAL_STORAGE', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE', 'INTERNET', 'ACCESS_NETWORK_STATE', 'REQUEST_INSTALL_PACKAGES') {
+    if ($x -notmatch "android\.permission\.$pm\b") {
+        $add += "<uses-permission android:name=`"android.permission.$pm`"/>`n    "
+    }
 }
+$attrs = ''
+if ($x -notmatch 'usesCleartextTraffic')         { $attrs += ' android:usesCleartextTraffic="true"' }
+if ($x -notmatch 'requestLegacyExternalStorage') { $attrs += ' android:requestLegacyExternalStorage="true"' }
+if ($x -notmatch 'preserveLegacyExternalStorage') { $attrs += ' android:preserveLegacyExternalStorage="true"' }
+$x = $x.Replace('<application', $add + '<application' + $attrs)
+
+# видимость браузера и приложений для открытия ссылок (Android 11+)
+if ($x -notmatch 'android:scheme="https"') {
+    $q = '<intent><action android:name="android.intent.action.VIEW"/><data android:scheme="https"/></intent>'
+    if ($x -match '<queries>') { $x = $x.Replace('<queries>', '<queries>' + $q) }
+    else { $x = $x.Replace('<application', '<queries>' + $q + '</queries>' + "`n    " + '<application') }
+}
+$x = [regex]::Replace($x, 'android:label="[^"]*"', 'android:label="Files You"', 1)
+[IO.File]::WriteAllText($m, $x, (New-Object Text.UTF8Encoding $false))
 
 # 3. Поиск NDK
 if (-not $env:ANDROID_NDK_HOME) {

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 const _ru = {
+  'viewer': 'Просмотр', 'player': 'Плеер', 'markdown': 'Markdown', 'allow': 'Разрешить', 'storage_access': 'Доступ к файлам', 'discard': 'Не сохранять', 'licenses': 'Лицензии открытых компонентов',
   'local': 'Локально', 'library': 'Библиотека', 'network': 'Сеть',
   'photos': 'Фото', 'audio': 'Аудио', 'video': 'Видео', 'docs': 'Документы', 'new_files': 'Новые файлы',
   'clean': 'Очистка', 'main_storage': 'Основная память', 'downloads': 'Загрузки', 'apps': 'Программы', 'trash': 'Корзина',
@@ -15,7 +16,7 @@ const _ru = {
   'copy': 'Копировать', 'cut': 'Вырезать', 'paste': 'Вставить', 'new_folder': 'Новая папка', 'select_all': 'Выбрать всё',
   'selected': 'Выбрано', 'settings': 'Настройки', 'about': 'О приложении', 'theme': 'Тема', 'light': 'Светлая', 'dark': 'Тёмная',
   'oled': 'OLED', 'accent': 'Акцентный цвет', 'folder_color': 'Цвет папок', 'accent_bg': 'Акцент влияет на фон',
-  'bg_color': 'Цвет фона', 'font': 'Шрифт', 'font_pick': 'Выбрать .ttf', 'font_default': 'Шрифт по умолчанию', 'system': 'Системный',
+  'bg_color': 'Цвет фона', 'font': 'Шрифт', 'font_pick': 'Выбрать .ttf', 'font_default': 'Шрифт по умолчанию', 'system': 'Системная',
   'ftp_title': 'Доступ из сети', 'login': 'Логин', 'password': 'Пароль', 'random_pass': 'Случайный пароль', 'port': 'Порт',
   'start': 'Пуск', 'stop': 'Остановить', 'running': 'Сервер запущен', 'stopped': 'Сервер остановлен', 'port_busy': 'Не удалось занять порт',
   'developers': 'Разработчики', 'clean_msg': 'Будут удалены корзина и кэш приложения.', 'cleaned': 'Очищено',
@@ -23,6 +24,7 @@ const _ru = {
   'moved_trash': 'Перемещено в корзину', 'permission': 'Нужен доступ ко всем файлам',
 };
 const _en = {
+  'viewer': 'Viewer', 'player': 'Player', 'markdown': 'Markdown', 'allow': 'Allow', 'storage_access': 'File access', 'discard': 'Discard', 'licenses': 'Open-source licenses',
   'local': 'Local', 'library': 'Library', 'network': 'Network',
   'photos': 'Photos', 'audio': 'Audio', 'video': 'Video', 'docs': 'Documents', 'new_files': 'New files',
   'clean': 'Clean up', 'main_storage': 'Main storage', 'downloads': 'Downloads', 'apps': 'Apps', 'trash': 'Trash',

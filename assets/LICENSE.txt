@@ -1,0 +1,37 @@
+Files You Non-Commercial License 1.0
+
+Copyright (c) 2026 Господин (@lyzos)
+
+Permission is granted, free of charge, to any person obtaining a copy of this
+software and associated files (the "Software"), to use, copy, modify, and
+distribute the Software, and to distribute modified versions, subject to the
+following conditions.
+
+1. NO SALE AND NO COMMERCIAL USE. The Software, and any work based on it, may
+   not be sold, licensed for a fee, rented, or otherwise distributed for money
+   or other compensation. It may not be offered as a paid product or paid
+   service, placed behind a paywall or subscription, or used to generate
+   revenue (including through advertising, in-app purchases, or paid
+   distribution on any store). Using the Software inside a commercial
+   organization for its business purposes is also not permitted.
+
+2. MODIFICATION IS ALLOWED. You may study, change, and extend the Software and
+   share your changes, provided that every copy or modified version you
+   distribute is free of charge and is released under these same terms.
+
+3. ATTRIBUTION. Keep this license text and the copyright notice with every
+   copy or substantial portion of the Software, and state clearly which
+   changes you made.
+
+4. THIRD-PARTY COMPONENTS. Libraries and assets used by the Software are not
+   covered by this license. They remain under their own licenses; see
+   THIRD_PARTY_NOTICES.md. This explicitly includes the Disket Mono font,
+   which is NOT part of the Software and is not licensed to you by these terms.
+
+5. TERMINATION. If you violate these terms, your rights under this license end
+   automatically.
+
+6. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR
+   PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
