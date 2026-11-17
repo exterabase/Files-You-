@@ -26,6 +26,7 @@ typedef _S2 = Pointer<Utf8> Function(Pointer<Utf8>, int);
 typedef _S2n = Pointer<Utf8> Function(Pointer<Utf8>, Int32);
 
 class Core {
+  static final _searchCache = <String, List<FE>>{};
   static DynamicLibrary? _lib;
   static bool _tried = false;
   static DynamicLibrary? get lib {
@@ -110,7 +111,15 @@ class Core {
   }
 
   static Future<List<FE>> searchAsync(String r, String q, List<String> e, bool h, int lim) =>
-      Isolate.run(() => search(r, q, e, h, lim));
+      () async {
+        final key = '$r|$q|${e.join(",")}|$h|$lim';
+        final cached = _searchCache[key];
+        if (cached != null) return List<FE>.of(cached);
+        final result = await Isolate.run(() => search(r, q, e, h, lim));
+        _searchCache[key] = result;
+        if (_searchCache.length > 24) _searchCache.remove(_searchCache.keys.first);
+        return result;
+      }();
   static Future<Map<String, dynamic>> scanAsync(String r) => Isolate.run(() => scan(r));
 
   // FTP (runs on the main isolate; the library is process-global)

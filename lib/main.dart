@@ -14,9 +14,10 @@ Future<void> main() async {
 
 ThemeData mk(Brightness b, ColorScheme? dyn) {
   final dark = b == Brightness.dark;
+  final seed = st.accent == 0xFFFFFFFF ? const Color(0xFF00897B) : Color(st.accent == 0 ? 0xFF6750A4 : st.accent);
   var cs = (st.accent == 0 && dyn != null)
       ? dyn
-      : ColorScheme.fromSeed(seedColor: Color(st.accent == 0 ? 0xFF6750A4 : st.accent), brightness: b);
+      : ColorScheme.fromSeed(seedColor: seed, brightness: b);
   Color scaffold = cs.surface;
   if (dark && st.theme == 3) {
     scaffold = Colors.black;

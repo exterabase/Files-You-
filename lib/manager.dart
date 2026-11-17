@@ -78,7 +78,6 @@ class _ManagerState extends State<Manager> {
 
   void _sort() {
     int c(FE a, FE b) {
-      if (a.dir != b.dir) return a.dir ? -1 : 1;
       switch (sort) {
         case 'size': return a.size.compareTo(b.size);
         case 'date': return a.mod.compareTo(b.mod);
@@ -86,7 +85,11 @@ class _ManagerState extends State<Manager> {
         default: return a.name.toLowerCase().compareTo(b.name.toLowerCase());
       }
     }
-    items.sort((a, b) => asc ? c(a, b) : c(b, a));
+    items.sort((a, b) {
+      final group = (a.dir ? 0 : 1).compareTo(b.dir ? 0 : 1);
+      if (group != 0) return group;
+      return asc ? c(a, b) : c(b, a);
+    });
   }
 
   void _cd(String path) {

@@ -126,7 +126,7 @@ class Shortcut extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: r * 2, height: r * 2, decoration: BoxDecoration(color: cs.secondaryContainer, shape: BoxShape.circle), child: Icon(icon, size: r * .9, color: cs.onSecondaryContainer)),
           const SizedBox(height: 8),
-          Text(label, textAlign: TextAlign.center, softWrap: true, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
         ]),
       ),
     );

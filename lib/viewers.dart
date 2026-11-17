@@ -15,6 +15,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'common.dart';
 import 'core.dart';
 import 'l10n.dart';
+import 'archive_utils.dart';
 
 Future<void> openFile(BuildContext context, FE e) async {
   final x = e.ext;
@@ -24,10 +25,64 @@ Future<void> openFile(BuildContext context, FE e) async {
   if (x == 'svg') v(Icons.image_rounded, t('viewer'), () => go(context, SvgView(path: e.path)));
   if (x == 'md' || x == 'markdown') v(Icons.article_rounded, t('markdown'), () => go(context, MdView(path: e.path)));
   if (audExt.contains(x) || vidExt.contains(x)) v(Icons.play_circle_rounded, t('player'), () => go(context, MediaView(path: e.path)));
+  if (isArchiveExt(x)) {
+    v(Icons.folder_zip_rounded, t('archive_view'), () => go(context, ArchiveView(path: e.path)));
+    v(Icons.unarchive_rounded, t('archive_extract'), () => _extractArchive(context, e.path));
+  }
+  if (x == 'apk') {
+    final packageName = p.basenameWithoutExtension(e.path);
+    if (RegExp(r'^[a-zA-Z][\w]*(\.[a-zA-Z][\w]*)+$').hasMatch(packageName)) {
+      v(Icons.store_rounded, t('play_market'), () => launchUrl(Uri.parse('market://details?id=$packageName')));
+    }
+  }
   if (x == 'html' || x == 'htm') {
     v(Icons.web_rounded, t('html_local'), () => go(context, HtmlView(path: e.path)));
     v(Icons.public_rounded, t('html_browser'), () => openInBrowser(e.path));
   }
+
+  Future<void> _extractArchive(BuildContext context, String path) async {
+    final destination = '${p.dirname(path)}/${p.basenameWithoutExtension(path)}';
+    try {
+      final count = await extractArchive(path, destination);
+      if (context.mounted) snack(context, '${t('archive_extracted')}: $count');
+    } on UnsupportedError {
+      await OpenFilex.open(path);
+    } catch (e) {
+      if (context.mounted) snack(context, '${t('error')}: $e');
+    }
+  }
+
+  class ArchiveView extends StatefulWidget {
+    final String path;
+    const ArchiveView({super.key, required this.path});
+    @override
+    State<ArchiveView> createState() => _ArchiveViewState();
+  }
+
+  class _ArchiveViewState extends State<ArchiveView> {
+    late Future<List<String>> entries;
+    @override
+    void initState() {
+      super.initState();
+      entries = Future(() => archiveEntries(widget.path));
+    }
+
+    @override
+    Widget build(BuildContext context) => Scaffold(
+          appBar: AppBar(title: Text(base(widget.path))),
+          body: FutureBuilder<List<String>>(
+            future: entries,
+            builder: (context, snap) {
+              if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              return ListView.builder(
+                padding: const EdgeInsets.only(bottom: 24),
+                itemCount: snap.data!.length,
+                itemBuilder: (_, i) => ListTile(leading: const Icon(Icons.insert_drive_file_rounded), title: Text(snap.data![i])),
+              );
+            },
+          ),
+        );
   v(Icons.notes_rounded, t('text_editor'), () => go(context, Editor(path: e.path, code: false)));
   v(Icons.code_rounded, t('code_editor'), () => go(context, Editor(path: e.path, code: true)));
   v(Icons.open_in_new_rounded, t('system_open'), () => OpenFilex.open(e.path));
