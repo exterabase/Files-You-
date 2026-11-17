@@ -34,6 +34,35 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          text = manifest.read_text()
+          permissions = [
+              "MANAGE_EXTERNAL_STORAGE",
+              "READ_EXTERNAL_STORAGE",
+              "WRITE_EXTERNAL_STORAGE",
+              "INTERNET",
+              "ACCESS_NETWORK_STATE",
+              "REQUEST_INSTALL_PACKAGES",
+          ]
+          marker = "<application"
+          additions = "".join(
+              f'    <uses-permission android:name="android.permission.{permission}"/>\n'
+              for permission in permissions
+              if f"android.permission.{permission}" not in text
+          )
+          text = text.replace(marker, additions + marker, 1)
+          text = text.replace(
+              '<application android:label="${applicationName}"',
+              '<application android:label="Files You" '
+              'android:usesCleartextTraffic="true" '
+              'android:requestLegacyExternalStorage="true"',
+              1,
+          )
+          manifest.write_text(text)
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+
           for path in Path("android").rglob("*.gradle*"):
               text = path.read_text()
               text = text.replace("flutter.compileSdkVersion", "36")
