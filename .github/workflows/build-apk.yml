@@ -51,12 +51,24 @@ jobs:
               if f"android.permission.{permission}" not in text
           )
           text = text.replace(marker, additions + marker, 1)
+          import re
+          text = re.sub(
+              r'(<application\b[^>]*?)\bandroid:label="[^"]*"',
+              r'\1android:label="Files You"',
+              text,
+              count=1,
+          )
           text = text.replace(
-              '<application android:label="${applicationName}"',
-              '<application android:label="Files You" '
-              'android:usesCleartextTraffic="true" '
+              '<application',
+              '<application android:usesCleartextTraffic="true" '
               'android:requestLegacyExternalStorage="true"',
               1,
+          )
+          text = re.sub(
+              r'(<activity\b[^>]*android:name="\.MainActivity"[^>]*?)>',
+              r'\1 android:label="Files You">',
+              text,
+              count=1,
           )
           manifest.write_text(text)
           PY

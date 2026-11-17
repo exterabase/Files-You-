@@ -25,15 +25,11 @@ const vidExt = {'mp4', 'mkv', 'avi', 'mov', 'webm', '3gp', 'm4v'};
 Future<T?> go<T>(BuildContext c, Widget w) => Navigator.push<T>(
       c,
       PageRouteBuilder<T>(
-        transitionDuration: const Duration(milliseconds: 380),
-        reverseTransitionDuration: const Duration(milliseconds: 280),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
         pageBuilder: (_, __, ___) => w,
         transitionsBuilder: (_, a, __, child) {
-          final cv = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
-          return FadeTransition(
-            opacity: cv,
-            child: SlideTransition(position: Tween(begin: const Offset(0, .05), end: Offset.zero).animate(cv), child: child),
-          );
+          return child;
         },
       ),
     );

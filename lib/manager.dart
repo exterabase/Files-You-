@@ -78,7 +78,7 @@ class _ManagerState extends State<Manager> {
 
   void _sort() {
     int c(FE a, FE b) {
-      if (a.dir != b.dir && sort != 'date') return a.dir ? -1 : 1;
+      if (a.dir != b.dir) return a.dir ? -1 : 1;
       switch (sort) {
         case 'size': return a.size.compareTo(b.size);
         case 'date': return a.mod.compareTo(b.mod);
@@ -316,9 +316,7 @@ class _ManagerState extends State<Manager> {
         itemBuilder: (_, i) {
           final e = items[i];
           final s = sel.contains(e.path);
-          return Appear(
-            i: i,
-            child: Tap(
+          return Tap(
               onTap: () => _tap(e),
               onLong: () => _long(e),
               scale: .98,
@@ -340,8 +338,7 @@ class _ManagerState extends State<Manager> {
                   ),
                 ]),
               ),
-            ),
-          );
+            );
         },
       );
 
@@ -356,9 +353,7 @@ class _ManagerState extends State<Manager> {
               for (var i = 0; i < items.length; i++)
                 SizedBox(
                   width: w,
-                  child: Appear(
-                    i: i,
-                    child: Tap(
+                  child: Tap(
                       onTap: () => _tap(items[i]),
                       onLong: () => _long(items[i]),
                       child: AnimatedContainer(
@@ -371,7 +366,6 @@ class _ManagerState extends State<Manager> {
                           Text(items[i].name, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                         ]),
                       ),
-                    ),
                   ),
                 ),
             ]),

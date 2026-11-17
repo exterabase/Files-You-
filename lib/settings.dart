@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class S extends ChangeNotifier {
   late SharedPreferences pr;
   // theme: 0 system, 1 light, 2 dark, 3 oled
-  int theme = 0, accent = 0, folder = 0xFFFFB300, bg = 0, _fontN = 0;
+  int theme = 0, accent = 0, folder = 0xFFFFFFFF, bg = 0, _fontN = 0;
   bool accentBg = true;
   String? fontPath;
   String? fontFamily;
@@ -15,7 +15,7 @@ class S extends ChangeNotifier {
     pr = await SharedPreferences.getInstance();
     theme = pr.getInt('theme2') ?? 0;
     accent = pr.getInt('accent') ?? 0;
-    folder = pr.getInt('folder') ?? 0xFFFFB300;
+    folder = pr.getInt('folder') ?? 0xFFFFFFFF;
     bg = pr.getInt('bg') ?? 0;
     accentBg = pr.getBool('accentBg') ?? true;
     fontPath = pr.getString('fontPath');
