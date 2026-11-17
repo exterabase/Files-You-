@@ -17,6 +17,49 @@ import 'core.dart';
 import 'l10n.dart';
 import 'archive_utils.dart';
 
+Future<void> _extractArchive(BuildContext context, String path) async {
+  final destination = '${p.dirname(path)}/${p.basenameWithoutExtension(path)}';
+  try {
+    final count = await extractArchive(path, destination);
+    if (context.mounted) snack(context, '${t('archive_extracted')}: $count');
+  } on UnsupportedError {
+    await OpenFilex.open(path);
+  } catch (e) {
+    if (context.mounted) snack(context, '${t('error')}: $e');
+  }
+}
+
+class ArchiveView extends StatefulWidget {
+  final String path;
+  const ArchiveView({super.key, required this.path});
+  @override
+  State<ArchiveView> createState() => _ArchiveViewState();
+}
+
+class _ArchiveViewState extends State<ArchiveView> {
+  late Future<List<String>> entries;
+  @override
+  void initState() {
+    super.initState();
+    entries = Future(() => archiveEntries(widget.path));
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(base(widget.path))),
+        body: FutureBuilder<List<String>>(
+          future: entries,
+          builder: (context, snap) {
+            if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            return ListView.builder(
+              padding: const EdgeInsets.only(bottom: 24),
+              itemCount: snap.data!.length,
+              itemBuilder: (_, i) => ListTile(leading: const Icon(Icons.insert_drive_file_rounded), title: Text(snap.data![i])),
+            );
+          },
+        ),
+      );
 }
 
 Future<void> openFile(BuildContext context, FE e) async {
@@ -42,49 +85,6 @@ Future<void> openFile(BuildContext context, FE e) async {
     v(Icons.public_rounded, t('html_browser'), () => openInBrowser(e.path));
   }
 
-  Future<void> _extractArchive(BuildContext context, String path) async {
-    final destination = '${p.dirname(path)}/${p.basenameWithoutExtension(path)}';
-    try {
-      final count = await extractArchive(path, destination);
-      if (context.mounted) snack(context, '${t('archive_extracted')}: $count');
-    } on UnsupportedError {
-      await OpenFilex.open(path);
-    } catch (e) {
-      if (context.mounted) snack(context, '${t('error')}: $e');
-    }
-  }
-
-  class ArchiveView extends StatefulWidget {
-    final String path;
-    const ArchiveView({super.key, required this.path});
-    @override
-    State<ArchiveView> createState() => _ArchiveViewState();
-  }
-
-  class _ArchiveViewState extends State<ArchiveView> {
-    late Future<List<String>> entries;
-    @override
-    void initState() {
-      super.initState();
-      entries = Future(() => archiveEntries(widget.path));
-    }
-
-    @override
-    Widget build(BuildContext context) => Scaffold(
-          appBar: AppBar(title: Text(base(widget.path))),
-          body: FutureBuilder<List<String>>(
-            future: entries,
-            builder: (context, snap) {
-              if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
-              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              return ListView.builder(
-                padding: const EdgeInsets.only(bottom: 24),
-                itemCount: snap.data!.length,
-                itemBuilder: (_, i) => ListTile(leading: const Icon(Icons.insert_drive_file_rounded), title: Text(snap.data![i])),
-              );
-            },
-          ),
-        );
   v(Icons.notes_rounded, t('text_editor'), () => go(context, Editor(path: e.path, code: false)));
   v(Icons.code_rounded, t('code_editor'), () => go(context, Editor(path: e.path, code: true)));
   v(Icons.open_in_new_rounded, t('system_open'), () => OpenFilex.open(e.path));
