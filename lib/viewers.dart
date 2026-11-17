@@ -197,11 +197,11 @@ class _MediaViewState extends State<MediaView> {
                     ValueListenableBuilder<VideoPlayerValue>(
                       valueListenable: c,
                       builder: (_, v, __) {
-                        final max = v.duration.inMilliseconds.toDouble().clamp(1, double.infinity);
+                        final max = v.duration.inMilliseconds.toDouble().clamp(1, double.infinity).toDouble();
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                           child: Column(children: [
-                            Slider(value: v.position.inMilliseconds.toDouble().clamp(0, max), max: max, onChanged: (x) => c.seekTo(Duration(milliseconds: x.round()))),
+                            Slider(value: v.position.inMilliseconds.toDouble().clamp(0, max).toDouble(), max: max, onChanged: (x) => c.seekTo(Duration(milliseconds: x.round()))),
                             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(_t(v.position)), Text(_t(v.duration))]),
                             const SizedBox(height: 12),
                             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -352,9 +352,9 @@ Future<void> openInBrowser(String file) async {
     final f = File('$dir/$rel');
     if (await f.exists()) {
       r.headers.contentType = ContentType.parse('${mime[p.extension(f.path).toLowerCase().replaceFirst('.', '')] ?? 'application/octet-stream'}; charset=utf-8');
-      await r.addStream(f.openRead());
+      await r.response.addStream(f.openRead());
     } else { r.response.statusCode = 404; }
-    await r.close();
+    await r.response.close();
   });
   await launchUrl(Uri.parse('http://127.0.0.1:${_srv!.port}/${Uri.encodeComponent(p.basename(file))}'), mode: LaunchMode.externalApplication);
 }
