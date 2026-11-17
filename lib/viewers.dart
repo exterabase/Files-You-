@@ -17,6 +17,8 @@ import 'core.dart';
 import 'l10n.dart';
 import 'archive_utils.dart';
 
+}
+
 Future<void> openFile(BuildContext context, FE e) async {
   final x = e.ext;
   final opts = <List<dynamic>>[];
