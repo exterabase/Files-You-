@@ -409,6 +409,7 @@ class _AnalyzerFile extends StatelessWidget {
         trailing: Text(fmt(file.size)),
         onTap: () => openFile(context, file),
       );
+}
 
 class InstalledApps extends StatefulWidget {
     const InstalledApps({super.key});
@@ -466,6 +467,8 @@ class _InstalledAppsState extends State<InstalledApps> {
           ),
         );
   }
+}
+
 class LibraryTab extends StatelessWidget {
   const LibraryTab({super.key});
   @override
