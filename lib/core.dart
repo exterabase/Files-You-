@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as p;
+import 'package:flutter/services.dart';
 
 class FE {
   final String path, name;
@@ -27,6 +28,7 @@ typedef _S2n = Pointer<Utf8> Function(Pointer<Utf8>, Int32);
 
 class Core {
   static final _searchCache = <String, List<FE>>{};
+  static const _appChannel = MethodChannel('files_you/apps');
   static DynamicLibrary? _lib;
   static bool _tried = false;
   static DynamicLibrary? get lib {
@@ -128,6 +130,24 @@ class Core {
         if (_searchCache.length > 24) _searchCache.remove(_searchCache.keys.first);
         return result;
       }();
+  static Future<List<FE>> categoryAsync(String root, List<String> exts, int limit) async {
+    try {
+      final rows = await _appChannel.invokeMethod<List<dynamic>>('categoryFiles', {
+        'exts': exts,
+        'limit': limit,
+      });
+      if (rows != null) {
+        return rows.map((e) => FE(
+          e['path'] as String,
+          p.basename(e['path'] as String),
+          false,
+          (e['size'] as num).toInt(),
+          (e['modified'] as num).toInt(),
+        )).toList();
+      }
+    } catch (_) {}
+    return searchAsync(root, '', exts, false, limit);
+  }
   static Future<Map<String, dynamic>> scanAsync(String r) => Isolate.run(() => scan(r));
 
   static Future<Map<String, dynamic>> analyze(String root) async {
@@ -173,6 +193,19 @@ class Core {
 
   static Future<Map<String, dynamic>> analyzeAsync(String root) =>
       Isolate.run(() => analyze(root));
+
+  static Future<Map<String, dynamic>> analyzeQuick(String root) async {
+    final l = lib;
+    if (l == null) return analyze(root);
+    final a = root.toNativeUtf8();
+    final f = l.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>), Pointer<Utf8> Function(Pointer<Utf8>)>('fy_analyze_quick');
+    final s = _take(f(a));
+    malloc.free(a);
+    return jsonDecode(s);
+  }
+
+  static Future<Map<String, dynamic>> analyzeQuickAsync(String root) =>
+      Isolate.run(() => analyzeQuick(root));
 
   // FTP (runs on the main isolate; the library is process-global)
   static bool ftpStart(String root, int port, String user, String pass, bool hidden) {

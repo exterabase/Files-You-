@@ -86,6 +86,9 @@ jobs:
           import android.graphics.Canvas;
           import android.graphics.drawable.Drawable;
           import android.net.Uri;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.provider.MediaStore;
           import android.util.Base64;
           import java.io.ByteArrayOutputStream;
           import java.util.ArrayList;
@@ -105,7 +108,10 @@ jobs:
               new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), CHANNEL)
                   .setMethodCallHandler((call, result) -> {
                     if ("installedApps".equals(call.method)) {
-                      result.success(installedApps());
+                      new Thread(() -> {
+                        List<Map<String, Object>> apps = installedApps();
+                        new Handler(Looper.getMainLooper()).post(() -> result.success(apps));
+                      }).start();
                     } else if ("launch".equals(call.method)) {
                       launch(String.valueOf(call.argument("package")));
                       result.success(null);
@@ -113,6 +119,13 @@ jobs:
                       Intent i = new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + call.argument("package")));
                       startActivity(i);
                       result.success(null);
+                    } else if ("categoryFiles".equals(call.method)) {
+                      List<String> exts = call.argument("exts");
+                      int limit = call.argument("limit") == null ? 1000 : (int) call.argument("limit");
+                      new Thread(() -> {
+                        List<Map<String, Object>> files = categoryFiles(exts, limit);
+                        new Handler(Looper.getMainLooper()).post(() -> result.success(files));
+                      }).start();
                     } else {
                       result.notImplemented();
                     }
@@ -128,10 +141,44 @@ jobs:
                 item.put("label", String.valueOf(pm.getApplicationLabel(app)));
                 item.put("package", app.packageName);
                 item.put("system", (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0);
-                item.put("icon", icon(app.loadIcon(pm)));
                 out.add(item);
               }
               out.sort((a, b) -> String.valueOf(a.get("label")).compareToIgnoreCase(String.valueOf(b.get("label"))));
+              return out;
+            }
+
+            private List<Map<String, Object>> categoryFiles(List<String> exts, int limit) {
+              List<Map<String, Object>> out = new ArrayList<>();
+              String[] projection = {
+                MediaStore.Files.FileColumns.DATA,
+                MediaStore.Files.FileColumns.SIZE,
+                MediaStore.Files.FileColumns.DATE_MODIFIED,
+                MediaStore.Files.FileColumns.MIME_TYPE
+              };
+              try (android.database.Cursor c = getContentResolver().query(
+                  MediaStore.Files.getContentUri("external"),
+                  projection,
+                  null,
+                  null,
+                  MediaStore.Files.FileColumns.DATE_MODIFIED + " DESC")) {
+                if (c == null) return out;
+                int dataIndex = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA);
+                int sizeIndex = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE);
+                int modifiedIndex = c.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED);
+                while (c.moveToNext() && out.size() < limit) {
+                  String path = c.getString(dataIndex);
+                  if (path == null) continue;
+                  int dot = path.lastIndexOf('.');
+                  if (dot < 0) continue;
+                  String ext = path.substring(dot + 1).toLowerCase();
+                  if (exts != null && !exts.isEmpty() && !exts.contains(ext)) continue;
+                  Map<String, Object> item = new HashMap<>();
+                  item.put("path", path);
+                  item.put("size", c.getLong(sizeIndex));
+                  item.put("modified", c.getLong(modifiedIndex));
+                  out.add(item);
+                }
+              } catch (Exception ignored) {}
               return out;
             }
 

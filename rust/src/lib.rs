@@ -107,12 +107,44 @@ fn file_fingerprint(p: &Path, size: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
     size.hash(&mut hasher);
     p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default().hash(&mut hasher);
-    if let Ok(mut f) = fs::File::open(p) {
-        let mut buf = [0u8; 1024 * 1024];
-        let len = f.read(&mut buf).unwrap_or(0);
-        buf[..len].hash(&mut hasher);
-    }
     hasher.finish()
+}
+
+#[no_mangle]
+pub extern "C" fn fy_analyze_quick(root: *const c_char) -> *mut c_char {
+    let root = cs(root);
+    let mut photo = 0u64;
+    let mut audio = 0u64;
+    let mut video = 0u64;
+    let mut documents = 0u64;
+    let mut apps = 0u64;
+    let mut other = 0u64;
+    let mut folders = HashMap::<String, u64>::new();
+    walk(&root, false, |p, m| {
+        if m.is_dir() { return true; }
+        if !m.is_file() { return true; }
+        let size = m.len();
+        let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        match ext.as_str() {
+            "jpg"|"jpeg"|"png"|"gif"|"webp"|"heic"|"heif"|"bmp"|"avif" => photo += size,
+            "mp3"|"wav"|"flac"|"m4a"|"ogg"|"aac"|"opus"|"amr"|"wma" => audio += size,
+            "mp4"|"mkv"|"avi"|"mov"|"webm"|"3gp"|"m4v" => video += size,
+            "pdf"|"doc"|"docx"|"xls"|"xlsx"|"ppt"|"pptx"|"txt"|"md"|"odt"|"rtf"|"csv"|"json"|"xml"|"html"|"htm" => documents += size,
+            "apk"|"xapk"|"apks"|"obb"|"aab" => apps += size,
+            _ => other += size,
+        }
+        let rel = p.strip_prefix(&root).unwrap_or(p).to_string_lossy().replace('\\', "/");
+        let top = rel.split('/').next().unwrap_or("").to_string();
+        if !top.is_empty() { *folders.entry(top).or_insert(0) += size; }
+        true
+    });
+    let mut folder_rows: Vec<Value> = folders.into_iter().map(|(name,size)| json!({"name":name,"size":size})).collect();
+    folder_rows.sort_by(|a,b| b["size"].as_u64().unwrap_or(0).cmp(&a["size"].as_u64().unwrap_or(0)));
+    out(json!({
+        "categories":{"photo":photo,"audio":audio,"video":video,"documents":documents,"apps":apps,"other":other},
+        "folders":folder_rows.into_iter().take(40).collect::<Vec<_>>(),
+        "large":[],"recent":[],"empty":[],"duplicates":[],"trash":[]
+    }).to_string())
 }
 
 #[no_mangle]

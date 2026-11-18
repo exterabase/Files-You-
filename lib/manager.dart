@@ -67,12 +67,18 @@ class _ManagerState extends State<Manager> {
     final my = ++gen;
     setState(() => loading = true);
     List<FE> r;
-    if (q.isNotEmpty || virtual) {
-      r = await Core.searchAsync(cur, q, widget.exts, hidden, widget.recent ? 4000 : 2000);
+    if (virtual) {
+      r = await Core.categoryAsync(cur, widget.exts, widget.recent ? 2000 : 1000);
+      if (q.isNotEmpty) {
+        final ql = q.toLowerCase();
+        r = r.where((e) => e.name.toLowerCase().contains(ql) || e.path.toLowerCase().contains(ql)).toList();
+      }
       if (widget.recent && q.isEmpty) {
         final lim = DateTime.now().millisecondsSinceEpoch ~/ 1000 - 14 * 86400;
         r = r.where((e) => e.mod > lim && !e.dir).toList();
       }
+    } else if (q.isNotEmpty) {
+      r = await Core.searchAsync(cur, q, const [], hidden, 1000);
     } else {
       r = await Core.listAsync(cur, hidden);
     }

@@ -269,7 +269,7 @@ class AnalyzerScreen extends StatefulWidget {
 }
 
 class _AnalyzerScreenState extends State<AnalyzerScreen> {
-  late Future<Map<String, dynamic>> data = Core.analyzeAsync(root);
+  late Future<Map<String, dynamic>> data = Core.analyzeQuickAsync(root);
   int mode = 0;
 
   @override
@@ -348,13 +348,16 @@ class _AnalyzerScreenState extends State<AnalyzerScreen> {
                 itemBuilder: (_, i) => ChoiceChip(
                   label: Text(modes[i]),
                   selected: mode == i,
-                  onSelected: (_) => setState(() => mode = i),
+                  onSelected: (_) => setState(() {
+                    mode = i;
+                    if (i > 0) data = Core.analyzeAsync(root);
+                  }),
                 ),
               ),
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () async => setState(() => data = Core.analyzeAsync(root)),
+                onRefresh: () async => setState(() => data = mode == 0 ? Core.analyzeQuickAsync(root) : Core.analyzeAsync(root)),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
