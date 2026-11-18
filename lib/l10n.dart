@@ -21,7 +21,7 @@ const _ru = {
   'start': 'Пуск', 'stop': 'Остановить', 'running': 'Сервер запущен', 'stopped': 'Сервер остановлен', 'port_busy': 'Не удалось занять порт',
   'developers': 'Разработчики', 'clean_msg': 'Будут удалены корзина и кэш приложения.', 'cleaned': 'Очищено',
   'host': 'Адрес', 'add': 'Добавить', 'no_places': 'Мест пока нет', 'error': 'Ошибка', 'cannot_read': 'Файл нельзя прочитать как текст',
-  'moved_trash': 'Перемещено в корзину', 'permission': 'Нужен доступ ко всем файлам', 'archive_view': 'Открыть архив', 'archive_extract': 'Распаковать', 'archive_extracted': 'Распаковано файлов', 'play_market': 'Открыть в Play Маркете',
+  'moved_trash': 'Перемещено в корзину', 'permission': 'Нужен доступ ко всем файлам', 'archive_view': 'Открыть архив', 'archive_extract': 'Распаковать', 'archive_extracted': 'Распаковано файлов', 'play_market': 'Открыть в Play Маркете', 'open': 'Открыть', 'analyzer': 'Анализатор', 'analyzer_categories': 'Категории', 'analyzer_large': 'Большие файлы',
 };
 const _en = {
   'viewer': 'Viewer', 'player': 'Player', 'markdown': 'Markdown', 'allow': 'Allow', 'storage_access': 'File access', 'discard': 'Discard', 'licenses': 'Open-source licenses',
@@ -44,6 +44,6 @@ const _en = {
   'start': 'Start', 'stop': 'Stop', 'running': 'Server running', 'stopped': 'Server stopped', 'port_busy': 'Could not bind port',
   'developers': 'Developers', 'clean_msg': 'Trash and app cache will be deleted.', 'cleaned': 'Cleaned',
   'host': 'Address', 'add': 'Add', 'no_places': 'No places yet', 'error': 'Error', 'cannot_read': 'File cannot be read as text',
-  'moved_trash': 'Moved to trash', 'permission': 'All-files access is required', 'archive_view': 'View archive', 'archive_extract': 'Extract', 'archive_extracted': 'Files extracted', 'play_market': 'Open in Play Store',
+  'moved_trash': 'Moved to trash', 'permission': 'All-files access is required', 'archive_view': 'View archive', 'archive_extract': 'Extract', 'archive_extracted': 'Files extracted', 'play_market': 'Open in Play Store', 'open': 'Open', 'analyzer': 'Storage analyzer', 'analyzer_categories': 'Categories', 'analyzer_large': 'Large files',
 };
 String t(String k) => (Platform.localeName.toLowerCase().startsWith('ru') ? _ru : _en)[k] ?? k;

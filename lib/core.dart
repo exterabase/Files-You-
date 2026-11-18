@@ -60,6 +60,13 @@ class Core {
         return Directory(path).listSync().where((e) => hidden || !p.basename(e.path).startsWith('.')).map(_fb).toList();
       } catch (_) { return []; }
     }
+
+    static Future<List<FE>> listAsync(String path, bool hidden) =>
+        Isolate.run(() => list(path, hidden));
+
+    static void invalidate(String path) {
+      _searchCache.removeWhere((key, _) => key.startsWith('$path|'));
+    }
     final a = path.toNativeUtf8();
     final f = l.lookupFunction<_S2n, _S2>('fy_list');
     final s = _take(f(a, hidden ? 1 : 0));

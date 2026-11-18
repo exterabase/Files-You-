@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'common.dart';
 import 'core.dart';
@@ -243,20 +244,141 @@ class _LocalTabState extends State<LocalTab> {
       ),
       const SizedBox(height: 14),
       Appear(i: 1, child: FilledButton.tonalIcon(onPressed: clean, icon: const Icon(Icons.cleaning_services_rounded), label: Text(t('clean')))),
+      const SizedBox(height: 8),
+      Appear(i: 2, child: FilledButton.tonalIcon(onPressed: () => go(context, const AnalyzerScreen()), icon: const Icon(Icons.analytics_rounded), label: Text(t('analyzer')))),
       const SizedBox(height: 26),
       Appear(
-        i: 2,
+        i: 3,
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(child: Shortcut(Icons.smartphone_rounded, t('main_storage'), () => go(context, Manager(path: root, title: t('main_storage'))))),
           Expanded(child: Shortcut(Icons.download_rounded, t('downloads'), () => go(context, Manager(path: Directory('$root/Download').existsSync() ? '$root/Download' : root, title: t('downloads'))))),
-          Expanded(child: Shortcut(Icons.android_rounded, t('apps'), () => go(context, Manager(path: root, title: t('apps'), exts: const ['apk', 'xapk', 'apks'])))),
+          Expanded(child: Shortcut(Icons.android_rounded, t('apps'), () => go(context, const InstalledApps()))),
           Expanded(child: Shortcut(Icons.delete_rounded, t('trash'), () { Directory(trashDir).createSync(recursive: true); go(context, Manager(path: trashDir, title: t('trash'), showHiddenForce: true)); })),
         ]),
       ),
     ]);
   }
-}
 
+  class AnalyzerScreen extends StatefulWidget {
+    const AnalyzerScreen({super.key});
+    @override
+    State<AnalyzerScreen> createState() => _AnalyzerScreenState();
+  }
+
+  class _AnalyzerScreenState extends State<AnalyzerScreen> {
+    late Future<List<dynamic>> data = _load();
+
+    Future<List<dynamic>> _load() async {
+      final result = await Future.wait([
+        Core.scanAsync(root),
+        Core.searchAsync(root, '', const [], false, 300),
+      ]);
+      final files = (result[1] as List).cast<FE>()..sort((a, b) => b.size.compareTo(a.size));
+      return [result[0] as Map<String, dynamic>, files.take(20).toList()];
+    }
+
+    @override
+    Widget build(BuildContext context) => Scaffold(
+          appBar: AppBar(title: Text(t('analyzer'), style: const TextStyle(fontWeight: FontWeight.w700))),
+          body: FutureBuilder<List<dynamic>>(
+            future: data,
+            builder: (context, snap) {
+              if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              final sizes = snap.data![0] as Map<String, dynamic>;
+              final files = snap.data![1] as List<FE>;
+              final categories = [('photos', 'photo'), ('audio', 'audio'), ('video', 'video')];
+              return RefreshIndicator(
+                onRefresh: () async => setState(() => data = _load()),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                  children: [
+                    Text(t('analyzer_categories'), style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    for (final item in categories)
+                      ListTile(
+                        leading: const Icon(Icons.data_usage_rounded),
+                        title: Text(t(item.$1)),
+                        trailing: Text(fmt((sizes[item.$2] as num?)?.toInt() ?? 0)),
+                      ),
+                    const SizedBox(height: 18),
+                    Text(t('analyzer_large'), style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    for (final file in files)
+                      ListTile(
+                        dense: true,
+                        leading: Leading(file, 40),
+                        title: Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(file.path, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        trailing: Text(fmt(file.size)),
+                        onTap: () => openFile(context, file),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+  }
+
+class InstalledApps extends StatefulWidget {
+    const InstalledApps({super.key});
+    @override
+    State<InstalledApps> createState() => _InstalledAppsState();
+  }
+
+class _InstalledAppsState extends State<InstalledApps> {
+    static const channel = MethodChannel('files_you/apps');
+    late Future<List<dynamic>> apps = _load();
+
+    Future<List<dynamic>> _load() async => (await channel.invokeMethod<List<dynamic>>('installedApps')) ?? [];
+
+    Future<void> _action(String method, String package) async {
+      await channel.invokeMethod(method, {'package': package});
+      if (method == 'uninstall' && mounted) setState(() => apps = _load());
+    }
+
+    @override
+    Widget build(BuildContext context) => Scaffold(
+          appBar: AppBar(title: Text(t('apps'), style: const TextStyle(fontWeight: FontWeight.w700))),
+          body: FutureBuilder<List<dynamic>>(
+            future: apps,
+            builder: (context, snap) {
+              if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
+              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+              return RefreshIndicator(
+                onRefresh: () async => setState(() => apps = _load()),
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
+                  padding: const EdgeInsets.only(bottom: 24),
+                  itemCount: snap.data!.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, indent: 76),
+                  itemBuilder: (_, i) {
+                    final app = Map<String, dynamic>.from(snap.data![i] as Map);
+                    final icon = app['icon'] as String?;
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                      leading: icon == null ? const CircleAvatar(child: Icon(Icons.android_rounded)) : CircleAvatar(backgroundImage: MemoryImage(base64Decode(icon))),
+                      title: Text(app['label'] as String, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(app['package'] as String, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () => _action('launch', app['package'] as String),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (v) => _action(v, app['package'] as String),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(value: 'launch', child: Text(t('open'))),
+                          PopupMenuItem(value: 'uninstall', child: Text(t('delete'))),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        );
+  }
+}
 class LibraryTab extends StatelessWidget {
   const LibraryTab({super.key});
   @override

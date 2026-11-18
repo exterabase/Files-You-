@@ -65,7 +65,7 @@ class _ArchiveViewState extends State<ArchiveView> {
 Future<void> openFile(BuildContext context, FE e) async {
   final x = e.ext;
   final opts = <List<dynamic>>[];
-  void v(IconData i, String l, VoidCallback f) => opts.add([i, l, f]);
+  void v(IconData i, String l, Future<dynamic> Function() f) => opts.add([i, l, f]);
   if (imgExt.contains(x)) v(Icons.image_rounded, t('viewer'), () => go(context, ImageView(path: e.path)));
   if (x == 'svg') v(Icons.image_rounded, t('viewer'), () => go(context, SvgView(path: e.path)));
   if (x == 'md' || x == 'markdown') v(Icons.article_rounded, t('markdown'), () => go(context, MdView(path: e.path)));
@@ -111,7 +111,7 @@ Future<void> openFile(BuildContext context, FE e) async {
                 i: i,
                 child: Tap(
                   scale: .97,
-                  onTap: () { Navigator.pop(c); (opts[i][2] as VoidCallback)(); },
+                  onTap: () async { Navigator.pop(c); await (opts[i][2] as Future<dynamic> Function())(); },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.all(12),

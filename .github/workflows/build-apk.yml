@@ -43,6 +43,7 @@ jobs:
               "INTERNET",
               "ACCESS_NETWORK_STATE",
               "REQUEST_INSTALL_PACKAGES",
+              "QUERY_ALL_PACKAGES",
           ]
           marker = "<application"
           additions = "".join(
@@ -72,6 +73,85 @@ jobs:
           )
           manifest.write_text(text)
           PY
+          rm -f android/app/src/main/kotlin/com/filesyou/files_you/MainActivity.kt
+          rm -f android/app/src/main/java/com/filesyou/files_you/MainActivity.java
+          mkdir -p android/app/src/main/java/com/filesyou/files_you
+          cat > android/app/src/main/java/com/filesyou/files_you/MainActivity.java <<'JAVA'
+          package com.filesyou.files_you;
+
+          import android.content.Intent;
+          import android.content.pm.ApplicationInfo;
+          import android.content.pm.PackageManager;
+          import android.graphics.Bitmap;
+          import android.graphics.Canvas;
+          import android.graphics.drawable.Drawable;
+          import android.net.Uri;
+          import android.util.Base64;
+          import java.io.ByteArrayOutputStream;
+          import java.util.ArrayList;
+          import java.util.HashMap;
+          import java.util.List;
+          import java.util.Map;
+          import io.flutter.embedding.android.FlutterActivity;
+          import io.flutter.embedding.engine.FlutterEngine;
+          import io.flutter.plugin.common.MethodChannel;
+
+          public class MainActivity extends FlutterActivity {
+            private static final String CHANNEL = "files_you/apps";
+
+            @Override
+            public void configureFlutterEngine(FlutterEngine engine) {
+              super.configureFlutterEngine(engine);
+              new MethodChannel(engine.getDartExecutor().getBinaryMessenger(), CHANNEL)
+                  .setMethodCallHandler((call, result) -> {
+                    if ("installedApps".equals(call.method)) {
+                      result.success(installedApps());
+                    } else if ("launch".equals(call.method)) {
+                      launch(String.valueOf(call.argument("package")));
+                      result.success(null);
+                    } else if ("uninstall".equals(call.method)) {
+                      Intent i = new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + call.argument("package")));
+                      startActivity(i);
+                      result.success(null);
+                    } else {
+                      result.notImplemented();
+                    }
+                  });
+            }
+
+            private List<Map<String, Object>> installedApps() {
+              PackageManager pm = getPackageManager();
+              List<Map<String, Object>> out = new ArrayList<>();
+              for (ApplicationInfo app : pm.getInstalledApplications(PackageManager.GET_META_DATA)) {
+                if (getPackageName().equals(app.packageName)) continue;
+                Map<String, Object> item = new HashMap<>();
+                item.put("label", String.valueOf(pm.getApplicationLabel(app)));
+                item.put("package", app.packageName);
+                item.put("system", (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0);
+                item.put("icon", icon(app.loadIcon(pm)));
+                out.add(item);
+              }
+              out.sort((a, b) -> String.valueOf(a.get("label")).compareToIgnoreCase(String.valueOf(b.get("label"))));
+              return out;
+            }
+
+            private String icon(Drawable drawable) {
+              int w = Math.max(1, drawable.getIntrinsicWidth());
+              int h = Math.max(1, drawable.getIntrinsicHeight());
+              Bitmap bitmap = Bitmap.createBitmap(Math.min(w, 128), Math.min(h, 128), Bitmap.Config.ARGB_8888);
+              drawable.setBounds(0, 0, bitmap.getWidth(), bitmap.getHeight());
+              drawable.draw(new Canvas(bitmap));
+              ByteArrayOutputStream stream = new ByteArrayOutputStream();
+              bitmap.compress(Bitmap.CompressFormat.PNG, 90, stream);
+              return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
+            }
+
+            private void launch(String packageName) {
+              Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
+              if (intent != null) startActivity(intent);
+            }
+          }
+          JAVA
           python3 - <<'PY'
           from pathlib import Path
 

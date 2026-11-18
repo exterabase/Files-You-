@@ -22,6 +22,7 @@ class _ManagerState extends State<Manager> {
   List<FE> items = [];
   final sel = <String>{};
   bool grid = false, asc = false, hidden = false, searching = false, loading = false;
+  double density = 1;
   String sort = 'date', q = '';
   final qc = TextEditingController();
   Timer? deb;
@@ -45,12 +46,15 @@ class _ManagerState extends State<Manager> {
     final s = st.pr.getString('fv:$cur') ?? st.pr.getString('fv:*');
     if (s != null) {
       final a = s.split('|');
-      if (a.length == 4) { grid = a[0] == '1'; sort = a[1]; asc = a[2] == '1'; hidden = a[3] == '1' || widget.showHiddenForce; }
+      if (a.length >= 4) {
+        grid = a[0] == '1'; sort = a[1]; asc = a[2] == '1'; hidden = a[3] == '1' || widget.showHiddenForce;
+        if (a.length > 4) density = double.tryParse(a[4])?.clamp(.75, 1.35) ?? 1;
+      }
     }
   }
 
   Future<void> _savePrefs({bool all = false}) async {
-    final v = '${grid ? 1 : 0}|$sort|${asc ? 1 : 0}|${hidden ? 1 : 0}';
+    final v = '${grid ? 1 : 0}|$sort|${asc ? 1 : 0}|${hidden ? 1 : 0}|${density.toStringAsFixed(2)}';
     if (all) {
       for (final k in st.pr.getKeys().where((k) => k.startsWith('fv:')).toList()) { await st.pr.remove(k); }
       await st.pr.setString('fv:*', v);
@@ -70,7 +74,7 @@ class _ManagerState extends State<Manager> {
         r = r.where((e) => e.mod > lim && !e.dir).toList();
       }
     } else {
-      r = Core.list(cur, hidden);
+      r = await Core.listAsync(cur, hidden);
     }
     if (!mounted || my != gen) return;
     setState(() { items = r; _sort(); loading = false; });
@@ -96,6 +100,12 @@ class _ManagerState extends State<Manager> {
     cur = path; sel.clear(); qc.clear(); q = ''; searching = false; _prefs(); _load();
   }
 
+  void _changed() {
+    Core.invalidate(cur);
+    if (mounted) setState(() {});
+    _load();
+  }
+
   Future<void> _delete() async {
     Directory(trashDir).createSync(recursive: true);
     final inTrash = cur.startsWith(trashDir);
@@ -114,7 +124,7 @@ class _ManagerState extends State<Manager> {
     }
     sel.clear();
     if (mounted) snack(context, t('moved_trash'));
-    _load();
+    _changed();
   }
 
   Future<String?> _ask(String title, String init) async {
@@ -153,7 +163,7 @@ class _ManagerState extends State<Manager> {
       } catch (_) {}
     }
     clip = [];
-    _load();
+    _changed();
   }
 
   Future<void> _rename() async {
@@ -163,7 +173,7 @@ class _ManagerState extends State<Manager> {
       final d = '${p.dirname(o)}/$n';
       try { FileSystemEntity.isDirectorySync(o) ? Directory(o).renameSync(d) : File(o).renameSync(d); } catch (_) {}
       sel.clear();
-      _load();
+      _changed();
     }
   }
 
@@ -186,9 +196,9 @@ class _ManagerState extends State<Manager> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         onSelected: (v) async {
           if (v == 'grid') { grid = !grid; }
-          else if (v == 'hidden') { hidden = !hidden; _load(); }
+          else if (v == 'hidden') { hidden = !hidden; _changed(); }
           else if (v == 'all') { await _savePrefs(all: true); if (mounted) snack(context, t('ok')); return; }
-          else if (v == 'newf') { final n = await _ask(t('new_folder'), ''); if (n != null && n.isNotEmpty) { Directory('$cur/$n').createSync(); _load(); } return; }
+          else if (v == 'newf') { final n = await _ask(t('new_folder'), ''); if (n != null && n.isNotEmpty) { Directory('$cur/$n').createSync(); _changed(); } return; }
           else if (v.startsWith('s:')) { final k = v.substring(2); if (sort == k) { asc = !asc; } else { sort = k; asc = k == 'name'; } _sort(); }
           setState(() {});
           _savePrefs();
@@ -207,10 +217,14 @@ class _ManagerState extends State<Manager> {
         ],
       );
 
-  void _tap(FE e) {
+  Future<void> _tap(FE e) async {
     if (sel.isNotEmpty) { setState(() => sel.contains(e.path) ? sel.remove(e.path) : sel.add(e.path)); }
     else if (e.dir) { _cd(e.path); }
-    else { openFile(context, e); }
+    else {
+      await openFile(context, e);
+      Core.invalidate(cur);
+      if (mounted && !virtual) _load();
+    }
   }
 
   void _long(FE e) => setState(() => sel.contains(e.path) ? sel.remove(e.path) : sel.add(e.path));
@@ -269,11 +283,21 @@ class _ManagerState extends State<Manager> {
               ),
             if (loading) const LinearProgressIndicator(minHeight: 2),
             Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 260),
-                child: items.isEmpty && !loading
-                    ? Center(key: const ValueKey('e'), child: Icon(Icons.folder_open_rounded, size: 72, color: cs.outlineVariant))
-                    : grid ? _grid(cs, bottom) : _list(cs, bottom),
+              child: GestureDetector(
+                onScaleUpdate: (details) {
+                  if (details.pointerCount < 2) return;
+                  final next = (density * details.scale).clamp(.75, 1.35);
+                  if ((next - density).abs() > .015) {
+                    setState(() => density = next);
+                    _savePrefs();
+                  }
+                },
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 120),
+                  child: items.isEmpty && !loading
+                      ? Center(key: const ValueKey('e'), child: Icon(Icons.folder_open_rounded, size: 72, color: cs.outlineVariant))
+                      : grid ? _grid(cs, bottom) : _list(cs, bottom),
+                ),
               ),
             ),
           ]),
@@ -312,10 +336,18 @@ class _ManagerState extends State<Manager> {
 
   String _sub(FE e) => e.dir ? fmtDate(e.mod) : '${fmt(e.size)}  ·  ${fmtDate(e.mod)}';
 
-  Widget _list(ColorScheme cs, double bottom) => ListView.builder(
+  Widget _list(ColorScheme cs, double bottom) => ListView.separated(
         key: ValueKey('l$cur$q'),
+        physics: const ClampingScrollPhysics(),
+        cacheExtent: 700,
         padding: EdgeInsets.only(bottom: 130 + bottom),
         itemCount: items.length,
+        separatorBuilder: (_, i) {
+          if (i + 1 < items.length && items[i].dir != items[i + 1].dir) {
+            return Divider(height: 18 * density, indent: 18, endIndent: 18, thickness: 1);
+          }
+          return SizedBox(height: 2 * density);
+        },
         itemBuilder: (_, i) {
           final e = items[i];
           final s = sel.contains(e.path);
@@ -325,18 +357,18 @@ class _ManagerState extends State<Manager> {
               scale: .98,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                padding: const EdgeInsets.all(10),
+                margin: EdgeInsets.symmetric(horizontal: 10, vertical: 1 * density),
+                padding: EdgeInsets.all(7 * density),
                 decoration: BoxDecoration(color: s ? cs.secondaryContainer : Colors.transparent, borderRadius: BorderRadius.circular(24)),
                 child: Row(children: [
-                  Leading(e, 58, selected: s),
-                  const SizedBox(width: 14),
+                  Leading(e, 46 * density, selected: s),
+                  SizedBox(width: 10 * density),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(e.name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
+                      Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14 * density, fontWeight: FontWeight.w600)),
+                      SizedBox(height: 1 * density),
                       if (q.isNotEmpty || virtual) Text(p.dirname(e.path), style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-                      Text(_sub(e), style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                      Text(_sub(e), style: TextStyle(fontSize: 11 * density, color: cs.onSurfaceVariant)),
                     ]),
                   ),
                 ]),
@@ -348,9 +380,10 @@ class _ManagerState extends State<Manager> {
   Widget _grid(ColorScheme cs, double bottom) => LayoutBuilder(
         key: ValueKey('g$cur$q'),
         builder: (c, box) {
-          final cols = (box.maxWidth / 112).floor().clamp(3, 8);
+          final cols = (box.maxWidth / (112 * density)).floor().clamp(2, 8);
           final w = (box.maxWidth - 24 - (cols - 1) * 8) / cols;
           return SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
             padding: EdgeInsets.fromLTRB(12, 4, 12, 130 + bottom),
             child: Wrap(spacing: 8, runSpacing: 8, children: [
               for (var i = 0; i < items.length; i++)
