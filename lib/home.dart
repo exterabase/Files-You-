@@ -467,7 +467,6 @@ class _InstalledAppsState extends State<InstalledApps> {
           ),
         );
   }
-}
 class LibraryTab extends StatelessWidget {
   const LibraryTab({super.key});
   @override
