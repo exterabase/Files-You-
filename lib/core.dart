@@ -29,6 +29,20 @@ typedef _S2n = Pointer<Utf8> Function(Pointer<Utf8>, Int32);
 class Core {
   static final _searchCache = <String, List<FE>>{};
   static const _appChannel = MethodChannel('files_you/apps');
+  static Future<bool> installBundle(String path) async {
+    try {
+      return await _appChannel.invokeMethod<bool>('installBundle', {'path': path}) ?? false;
+    } on PlatformException {
+      return false;
+    }
+    static Future<String?> initialIntentPath() async {
+      try {
+        return await _appChannel.invokeMethod<String>('initialIntentPath');
+      } on PlatformException {
+        return null;
+      }
+    }
+  }
   static DynamicLibrary? _lib;
   static bool _tried = false;
   static DynamicLibrary? get lib {

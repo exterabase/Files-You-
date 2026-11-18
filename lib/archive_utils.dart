@@ -13,13 +13,48 @@ Archive _decode(String path) {
   throw UnsupportedError('7z');
 }
 
-List<String> archiveEntries(String path) => _decode(path).files.map((e) => e.name).toList();
+class ArchiveEntry {
+  final String name;
+  final bool isFile;
+  final int size;
+  const ArchiveEntry(this.name, this.isFile, this.size);
+}
+
+List<ArchiveEntry> archiveEntries(String path) => _decode(path).files
+    .map((e) => ArchiveEntry(e.name.replaceAll('\\', '/'), e.isFile, e.size))
+    .toList();
+
+List<ArchiveEntry> archiveEntriesAt(String path, String prefix) {
+  final root = prefix.isEmpty ? '' : '${prefix.replaceAll('\\', '/').replaceAll(RegExp(r'^/+|/+$'), '')}/';
+  final children = <String, ArchiveEntry>{};
+  for (final entry in archiveEntries(path)) {
+    if (!entry.name.startsWith(root) || entry.name == root) continue;
+    final rest = entry.name.substring(root.length);
+    final slash = rest.indexOf('/');
+    if (slash < 0) {
+      children[rest] = entry;
+    } else {
+      final name = rest.substring(0, slash);
+      children[name] = ArchiveEntry('$root$name/', false, 0);
+    }
+  }
+  return children.values.toList()..sort((a, b) {
+    final dirs = (a.isFile ? 1 : 0).compareTo(b.isFile ? 1 : 0);
+    return dirs != 0 ? dirs : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+  });
+}
 
 Future<int> extractArchive(String path, String destination) async {
+  return extractArchiveEntries(path, destination, null);
+}
+
+Future<int> extractArchiveEntries(String path, String destination, Set<String>? selected) async {
   final archive = _decode(path);
   var count = 0;
   final root = Directory(destination)..createSync(recursive: true);
+  final names = selected?.map((s) => s.replaceAll('\\', '/').replaceAll(RegExp(r'/+$'), '')).toSet();
   for (final entry in archive) {
+    if (names != null && names.isNotEmpty && !names.any((s) => entry.name == s || entry.name.startsWith('$s/'))) continue;
     final target = p.normalize(p.join(root.path, entry.name));
     if (!p.isWithin(root.path, target) && target != root.path) {
       throw const FormatException('Archive contains an unsafe path');

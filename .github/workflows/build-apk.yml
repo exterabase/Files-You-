@@ -71,6 +71,31 @@ jobs:
               text,
               count=1,
           )
+          text = text.replace(
+              '</activity>',
+              '''<intent-filter>
+                      <action android:name="android.intent.action.VIEW"/>
+                      <category android:name="android.intent.category.DEFAULT"/>
+                      <category android:name="android.intent.category.BROWSABLE"/>
+                      <data android:mimeType="application/zip"/>
+                      <data android:mimeType="application/x-7z-compressed"/>
+                      <data android:mimeType="application/x-rar-compressed"/>
+                      <data android:mimeType="application/gzip"/>
+                      <data android:mimeType="application/x-tar"/>
+                      <data android:mimeType="application/vnd.android.package-archive"/>
+                      <data android:mimeType="application/pdf"/>
+                      <data android:mimeType="text/plain"/>
+                      <data android:mimeType="text/html"/>
+                      <data android:mimeType="application/msword"/>
+                      <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+                      <data android:mimeType="application/vnd.ms-excel"/>
+                      <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
+                      <data android:mimeType="application/vnd.ms-powerpoint"/>
+                      <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation"/>
+                    </intent-filter>
+                  </activity>''',
+              1,
+          )
           manifest.write_text(text)
           PY
           rm -f android/app/src/main/kotlin/com/filesyou/files_you/MainActivity.kt
@@ -79,6 +104,7 @@ jobs:
           cat > android/app/src/main/java/com/filesyou/files_you/MainActivity.java <<'JAVA'
           package com.filesyou.files_you;
 
+          import android.app.PendingIntent;
           import android.content.Intent;
           import android.content.pm.ApplicationInfo;
           import android.content.pm.PackageManager;
@@ -89,7 +115,13 @@ jobs:
           import android.os.Handler;
           import android.os.Looper;
           import android.provider.MediaStore;
-          import android.util.Base64;
+          import android.content.pm.PackageInstaller;
+          import java.io.File;
+          import java.io.FileInputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.util.zip.ZipEntry;
+          import java.util.zip.ZipInputStream;
           import java.io.ByteArrayOutputStream;
           import java.util.ArrayList;
           import java.util.HashMap;
@@ -126,6 +158,13 @@ jobs:
                         List<Map<String, Object>> files = categoryFiles(exts, limit);
                         new Handler(Looper.getMainLooper()).post(() -> result.success(files));
                       }).start();
+                    } else if ("installBundle".equals(call.method)) {
+                      new Thread(() -> {
+                        boolean installed = installBundle(String.valueOf(call.argument("path")));
+                        new Handler(Looper.getMainLooper()).post(() -> result.success(installed));
+                      }).start();
+                    } else if ("initialIntentPath".equals(call.method)) {
+                      result.success(initialIntentPath());
                     } else {
                       result.notImplemented();
                     }
@@ -182,20 +221,80 @@ jobs:
               return out;
             }
 
-            private String icon(Drawable drawable) {
-              int w = Math.max(1, drawable.getIntrinsicWidth());
-              int h = Math.max(1, drawable.getIntrinsicHeight());
-              Bitmap bitmap = Bitmap.createBitmap(Math.min(w, 128), Math.min(h, 128), Bitmap.Config.ARGB_8888);
-              drawable.setBounds(0, 0, bitmap.getWidth(), bitmap.getHeight());
-              drawable.draw(new Canvas(bitmap));
-              ByteArrayOutputStream stream = new ByteArrayOutputStream();
-              bitmap.compress(Bitmap.CompressFormat.PNG, 90, stream);
-              return Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP);
-            }
-
             private void launch(String packageName) {
               Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
               if (intent != null) startActivity(intent);
+            }
+
+            private String initialIntentPath() {
+              Intent intent = getIntent();
+              Uri uri = intent == null ? null : intent.getData();
+              if (uri == null) return null;
+              if ("file".equalsIgnoreCase(uri.getScheme())) return uri.getPath();
+              if (!"content".equalsIgnoreCase(uri.getScheme())) return uri.toString();
+              String name = uri.getLastPathSegment();
+              if (name == null || name.isEmpty()) name = "incoming-file";
+              File out = new File(getCacheDir(), name.replaceAll("[^a-zA-Z0-9._-]", "_"));
+              try (InputStream in = getContentResolver().openInputStream(uri);
+                   OutputStream stream = new java.io.FileOutputStream(out)) {
+                if (in == null) return null;
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1) stream.write(buf, 0, n);
+                return out.getAbsolutePath();
+              } catch (Exception e) {
+                return null;
+              }
+            }
+
+            private boolean installBundle(String path) {
+              File source = new File(path);
+              if (!source.isFile()) return false;
+              ArrayList<File> apks = new ArrayList<>();
+              if (path.toLowerCase().endsWith(".apk")) {
+                apks.add(source);
+              } else {
+                try (ZipInputStream zip = new ZipInputStream(new FileInputStream(source))) {
+                  ZipEntry entry;
+                  File dir = new File(getCacheDir(), "bundle-" + System.currentTimeMillis());
+                  if (!dir.mkdirs()) return false;
+                  while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.isDirectory() || !entry.getName().toLowerCase().endsWith(".apk")) continue;
+                    File apk = new File(dir, new File(entry.getName()).getName());
+                    try (OutputStream out = new java.io.FileOutputStream(apk)) {
+                      byte[] buf = new byte[8192];
+                      int n;
+                      while ((n = zip.read(buf)) != -1) out.write(buf, 0, n);
+                    }
+                    apks.add(apk);
+                  }
+                } catch (Exception e) {
+                  return false;
+                }
+              }
+              if (apks.isEmpty()) return false;
+              PackageInstaller installer = getPackageManager().getPackageInstaller();
+              PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+              params.setSize(0);
+              int id;
+              try {
+                id = installer.createSession(params);
+                PackageInstaller.Session session = installer.openSession(id);
+                for (File apk : apks) {
+                  try (FileInputStream in = new FileInputStream(apk);
+                       OutputStream out = session.openWrite(apk.getName(), 0, apk.length())) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                    session.fsync(out);
+                  }
+                }
+                Intent status = new Intent(MainActivity.this, MainActivity.class);
+                session.commit(PendingIntent.getBroadcast(MainActivity.this, id, status, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE).getIntentSender());
+                return true;
+              } catch (Exception e) {
+                return false;
+              }
             }
           }
           JAVA

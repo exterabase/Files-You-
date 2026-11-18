@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'common.dart';
 import 'core.dart';
@@ -162,6 +163,14 @@ class _LocalTabState extends State<LocalTab> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final path = await Core.initialIntentPath();
+      if (!mounted || path == null || path.isEmpty) return;
+      final file = File(path);
+      if (!file.existsSync()) return;
+      final s = file.statSync();
+      await openFile(context, FE(path, p.basename(path), s.type == FileSystemEntityType.directory, s.size, s.modified.millisecondsSinceEpoch ~/ 1000));
+    });
     sto = Core.storage(root);
     Core.scanAsync(root).then((v) { if (mounted) setState(() => sc = v); });
   }

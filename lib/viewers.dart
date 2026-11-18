@@ -37,17 +37,51 @@ class ArchiveView extends StatefulWidget {
 }
 
 class _ArchiveViewState extends State<ArchiveView> {
-  late Future<List<String>> entries;
+  late Future<List<ArchiveEntry>> entries;
+  String prefix = '';
+  final selected = <String>{};
   @override
   void initState() {
     super.initState();
-    entries = Future(() => archiveEntries(widget.path));
+    _load();
+  }
+
+  void _load() => entries = Future(() => archiveEntriesAt(widget.path, prefix));
+
+  Future<void> _extract() async {
+    if (selected.isEmpty) return;
+    final destination = '${p.dirname(widget.path)}/${p.basenameWithoutExtension(widget.path)}';
+    try {
+      final count = await extractArchiveEntries(widget.path, destination, selected);
+      if (mounted) {
+        setState(() => selected.clear());
+        snack(context, '${t('archive_extracted')}: $count');
+      }
+    } catch (e) {
+      if (mounted) snack(context, '${t('error')}: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(base(widget.path))),
-        body: FutureBuilder<List<String>>(
+        appBar: AppBar(
+          title: Text(prefix.isEmpty ? base(widget.path) : p.basename(prefix)),
+          leading: prefix.isEmpty ? null : IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => setState(() {
+              prefix = prefix.split('/').where((e) => e.isNotEmpty).toList().reversed.skip(1).toList().reversed.join('/');
+              _load();
+            }),
+          ),
+          actions: [
+            if (selected.isNotEmpty) IconButton(
+              tooltip: t('archive_extract'),
+              icon: const Icon(Icons.unarchive_rounded),
+              onPressed: _extract,
+            ),
+          ],
+        ),
+        body: FutureBuilder<List<ArchiveEntry>>(
           future: entries,
           builder: (context, snap) {
             if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
@@ -55,7 +89,30 @@ class _ArchiveViewState extends State<ArchiveView> {
             return ListView.builder(
               padding: const EdgeInsets.only(bottom: 24),
               itemCount: snap.data!.length,
-              itemBuilder: (_, i) => ListTile(leading: const Icon(Icons.insert_drive_file_rounded), title: Text(snap.data![i])),
+              itemBuilder: (_, i) {
+                final e = snap.data![i];
+                final full = e.name;
+                final name = p.basename(full);
+                final isSelected = selected.contains(full);
+                return ListTile(
+                  leading: Icon(e.isFile ? Icons.insert_drive_file_rounded : Icons.folder_rounded),
+                  title: Text(name),
+                  subtitle: e.isFile ? Text(fmt(e.size)) : null,
+                  selected: isSelected,
+                  onTap: () {
+                    if (!e.isFile) {
+                      setState(() {
+                        prefix = full;
+                        selected.clear();
+                        _load();
+                      });
+                    } else {
+                      setState(() => isSelected ? selected.remove(full) : selected.add(full));
+                    }
+                  },
+                  onLongPress: () => setState(() => isSelected ? selected.remove(full) : selected.add(full)),
+                );
+              },
             );
           },
         ),
@@ -64,6 +121,27 @@ class _ArchiveViewState extends State<ArchiveView> {
 
 Future<void> openFile(BuildContext context, FE e) async {
   final x = e.ext;
+  const docs = {
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odp', 'ods', 'odt',
+    'rtf', 'txt', 'csv', 'epub', 'mobi', 'pages', 'numbers', 'key',
+  };
+  if (docs.contains(x)) {
+    await OpenFilex.open(e.path);
+    return;
+  }
+  if (x == 'apks' || x == 'apkm' || x == 'xapk') {
+    final ok = await Core.installBundle(e.path);
+    if (!ok && context.mounted) snack(context, t('error'));
+    return;
+  }
+  if (x == 'apk') {
+    await OpenFilex.open(e.path);
+    return;
+  }
+  if (isArchiveExt(x) && x != '7z') {
+    await go(context, ArchiveView(path: e.path));
+    return;
+  }
   final opts = <List<dynamic>>[];
   void v(IconData i, String l, Future<dynamic> Function() f) => opts.add([i, l, f]);
   if (imgExt.contains(x)) v(Icons.image_rounded, t('viewer'), () => go(context, ImageView(path: e.path)));
@@ -85,7 +163,7 @@ Future<void> openFile(BuildContext context, FE e) async {
     v(Icons.public_rounded, t('html_browser'), () => openInBrowser(e.path));
   }
 
-  v(Icons.notes_rounded, t('text_editor'), () => go(context, Editor(path: e.path, code: false)));
+  if (x == 'txt' || x == 'csv' || x == 'rtf') v(Icons.notes_rounded, t('text_editor'), () => go(context, Editor(path: e.path, code: false)));
   v(Icons.code_rounded, t('code_editor'), () => go(context, Editor(path: e.path, code: true)));
   v(Icons.open_in_new_rounded, t('system_open'), () => OpenFilex.open(e.path));
   await showModalBottomSheet(
