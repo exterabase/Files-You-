@@ -61,17 +61,18 @@ class Core {
       } catch (_) { return []; }
     }
 
-    static Future<List<FE>> listAsync(String path, bool hidden) =>
-        Isolate.run(() => list(path, hidden));
-
-    static void invalidate(String path) {
-      _searchCache.removeWhere((key, _) => key.startsWith('$path|'));
-    }
     final a = path.toNativeUtf8();
     final f = l.lookupFunction<_S2n, _S2>('fy_list');
     final s = _take(f(a, hidden ? 1 : 0));
     malloc.free(a);
     return (jsonDecode(s) as List).map((e) => FE.fromJson(e)).toList();
+  }
+
+  static Future<List<FE>> listAsync(String path, bool hidden) =>
+      Isolate.run(() => list(path, hidden));
+
+  static void invalidate(String path) {
+    _searchCache.removeWhere((key, _) => key.startsWith('$path|'));
   }
 
   static FE _fb(FileSystemEntity e) {

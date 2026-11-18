@@ -259,7 +259,9 @@ class _LocalTabState extends State<LocalTab> {
     ]);
   }
 
-  class AnalyzerScreen extends StatefulWidget {
+}
+
+class AnalyzerScreen extends StatefulWidget {
     const AnalyzerScreen({super.key});
     @override
     State<AnalyzerScreen> createState() => _AnalyzerScreenState();
@@ -321,6 +323,7 @@ class _LocalTabState extends State<LocalTab> {
           ),
         );
   }
+}
 
 class InstalledApps extends StatefulWidget {
     const InstalledApps({super.key});
