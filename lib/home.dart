@@ -10,6 +10,7 @@ import 'l10n.dart';
 import 'manager.dart';
 import 'other.dart';
 import 'settings.dart';
+import 'viewers.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -323,7 +324,6 @@ class AnalyzerScreen extends StatefulWidget {
           ),
         );
   }
-}
 
 class InstalledApps extends StatefulWidget {
     const InstalledApps({super.key});
@@ -381,7 +381,6 @@ class _InstalledAppsState extends State<InstalledApps> {
           ),
         );
   }
-}
 class LibraryTab extends StatelessWidget {
   const LibraryTab({super.key});
   @override
