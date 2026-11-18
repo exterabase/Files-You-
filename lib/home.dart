@@ -263,67 +263,152 @@ class _LocalTabState extends State<LocalTab> {
 }
 
 class AnalyzerScreen extends StatefulWidget {
-    const AnalyzerScreen({super.key});
-    @override
-    State<AnalyzerScreen> createState() => _AnalyzerScreenState();
-  }
+  const AnalyzerScreen({super.key});
+  @override
+  State<AnalyzerScreen> createState() => _AnalyzerScreenState();
+}
 
-  class _AnalyzerScreenState extends State<AnalyzerScreen> {
-    late Future<List<dynamic>> data = _load();
+class _AnalyzerScreenState extends State<AnalyzerScreen> {
+  late Future<Map<String, dynamic>> data = Core.analyzeAsync(root);
+  int mode = 0;
 
-    Future<List<dynamic>> _load() async {
-      final result = await Future.wait([
-        Core.scanAsync(root),
-        Core.searchAsync(root, '', const [], false, 300),
-      ]);
-      final files = (result[1] as List).cast<FE>()..sort((a, b) => b.size.compareTo(a.size));
-      return [result[0] as Map<String, dynamic>, files.take(20).toList()];
-    }
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(title: Text(t('analyzer'), style: const TextStyle(fontWeight: FontWeight.w700))),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: data,
+        builder: (context, snap) {
+          if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
+          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+          final report = snap.data!;
+          final categories = Map<String, dynamic>.from(report['categories'] as Map);
+          final folderRows = (report['folders'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          final modes = <String>[
+            t('all_sections'),
+            t('analyzer_large'),
+            t('recent_files'),
+            t('empty_folders'),
+            t('duplicates'),
+            t('trash'),
+          ];
+          final keys = ['all', 'large', 'recent', 'empty', 'duplicates', 'trash'];
+          final selected = keys[mode];
 
-    @override
-    Widget build(BuildContext context) => Scaffold(
-          appBar: AppBar(title: Text(t('analyzer'), style: const TextStyle(fontWeight: FontWeight.w700))),
-          body: FutureBuilder<List<dynamic>>(
-            future: data,
-            builder: (context, snap) {
-              if (snap.hasError) return Center(child: Text('${t('error')}: ${snap.error}'));
-              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              final sizes = snap.data![0] as Map<String, dynamic>;
-              final files = snap.data![1] as List<FE>;
-              final categories = [('photos', 'photo'), ('audio', 'audio'), ('video', 'video')];
-              return RefreshIndicator(
-                onRefresh: () async => setState(() => data = _load()),
+          List<Widget> resultRows() {
+            if (selected == 'all') {
+              return [
+                Text(t('analyzer_categories'), style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                for (final item in [
+                  ('photo', 'photos', Icons.photo_rounded),
+                  ('video', 'video', Icons.movie_rounded),
+                  ('audio', 'audio', Icons.music_note_rounded),
+                  ('documents', 'docs', Icons.description_rounded),
+                  ('apps', 'apps', Icons.android_rounded),
+                  ('other', 'other', Icons.insert_drive_file_rounded),
+                ])
+                  _AnalyzerCategory(item.$1, t(item.$2), item.$3, (categories[item.$1] as num?)?.toInt() ?? 0),
+                const SizedBox(height: 18),
+                Text(t('folders'), style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                for (final folder in folderRows)
+                  ListTile(
+                    leading: const Icon(Icons.folder_rounded),
+                    title: Text(folder['name'] as String),
+                    trailing: Text(fmt((folder['size'] as num).toInt())),
+                    onTap: () => go(context, Manager(path: '$root/${folder['name']}', title: folder['name'] as String)),
+                  ),
+              ];
+            }
+            if (selected == 'duplicates') {
+              final groups = report['duplicates'] as List;
+              if (groups.isEmpty) return [Center(child: Text(t('empty')))];
+              return [
+                for (final group in groups)
+                  for (final file in (group['files'] as List))
+                    _AnalyzerFile(FE.fromJson(Map<String, dynamic>.from(file as Map))),
+              ];
+            }
+            final key = selected;
+            final rows = (report[key] as List).map((e) => FE.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+            if (rows.isEmpty) return [Center(child: Text(t('empty')))];
+            return [_forFiles(rows)];
+          }
+
+          return Column(children: [
+            SizedBox(
+              height: 58,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                itemCount: modes.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => ChoiceChip(
+                  label: Text(modes[i]),
+                  selected: mode == i,
+                  onSelected: (_) => setState(() => mode = i),
+                ),
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async => setState(() => data = Core.analyzeAsync(root)),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics()),
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-                  children: [
-                    Text(t('analyzer_categories'), style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    for (final item in categories)
-                      ListTile(
-                        leading: const Icon(Icons.data_usage_rounded),
-                        title: Text(t(item.$1)),
-                        trailing: Text(fmt((sizes[item.$2] as num?)?.toInt() ?? 0)),
-                      ),
-                    const SizedBox(height: 18),
-                    Text(t('analyzer_large'), style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    for (final file in files)
-                      ListTile(
-                        dense: true,
-                        leading: Leading(file, 40),
-                        title: Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        subtitle: Text(file.path, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        trailing: Text(fmt(file.size)),
-                        onTap: () => openFile(context, file),
-                      ),
-                  ],
+                  children: resultRows(),
                 ),
-              );
-            },
-          ),
-        );
+              ),
+            ),
+          ]);
+        },
+      ),
+    );
   }
+
+  Widget _forFiles(List<FE> files) => Column(
+        children: [
+          for (final file in files)
+            _AnalyzerFile(file),
+        ],
+      );
+}
+
+class _AnalyzerCategory extends StatelessWidget {
+  final String category;
+  final String label;
+  final IconData icon;
+  final int size;
+  const _AnalyzerCategory(this.category, this.label, this.icon, this.size);
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(20)),
+      child: ListTile(
+        leading: CircleAvatar(backgroundColor: cs.primaryContainer, foregroundColor: cs.onPrimaryContainer, child: Icon(icon)),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        trailing: Text(fmt(size), style: const TextStyle(fontWeight: FontWeight.w700)),
+      ),
+    );
+  }
+}
+
+class _AnalyzerFile extends StatelessWidget {
+  final FE file;
+  const _AnalyzerFile(this.file);
+  @override
+  Widget build(BuildContext context) => ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        leading: Leading(file, 44),
+        title: Text(file.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(file.path, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: Text(fmt(file.size)),
+        onTap: () => openFile(context, file),
+      );
 
 class InstalledApps extends StatefulWidget {
     const InstalledApps({super.key});

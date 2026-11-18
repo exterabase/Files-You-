@@ -137,7 +137,13 @@ class Leading extends StatelessWidget {
             errorBuilder: (_, __, ___) => tile(cs.primaryContainer, iconFor(e), cs.onPrimaryContainer, .5, const ValueKey('f'))),
       );
     } else {
-      inner = tile(cs.primaryContainer, iconFor(e), cs.onPrimaryContainer, .5, ValueKey('f${e.ext}'));
+      inner = tile(
+        const Color(0xFF455A64),
+        iconFor(e),
+        Colors.white,
+        .5,
+        ValueKey('f${e.ext}'),
+      );
     }
     return AnimatedSwitcher(duration: const Duration(milliseconds: 220), child: inner);
   }

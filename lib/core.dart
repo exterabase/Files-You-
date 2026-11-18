@@ -130,6 +130,50 @@ class Core {
       }();
   static Future<Map<String, dynamic>> scanAsync(String r) => Isolate.run(() => scan(r));
 
+  static Future<Map<String, dynamic>> analyze(String root) async {
+    final l = lib;
+    if (l == null) {
+      final files = <FE>[];
+      try {
+        for (final entity in Directory(root).listSync(recursive: true, followLinks: false)) {
+          if (entity is! Directory) files.add(_fb(entity));
+        }
+      } catch (_) {}
+      files.sort((a, b) => b.size.compareTo(a.size));
+      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      final categories = <String, int>{'photo': 0, 'audio': 0, 'video': 0, 'documents': 0, 'apps': 0, 'other': 0};
+      for (final file in files) {
+        final ext = file.ext;
+        const photoExt = {'jpg','jpeg','png','gif','webp','heic','heif','bmp','avif','svg'};
+        const audioExt = {'mp3','wav','flac','m4a','ogg','aac','opus','amr','wma'};
+        const videoExt = {'mp4','mkv','avi','mov','webm','3gp','m4v'};
+        final category = photoExt.contains(ext) ? 'photo'
+            : audioExt.contains(ext) ? 'audio'
+            : videoExt.contains(ext) ? 'video'
+            : {'pdf','doc','docx','xls','xlsx','ppt','pptx','txt','md','odt','rtf','csv','json','xml','html','htm'}.contains(ext) ? 'documents'
+            : {'apk','xapk','apks','obb','aab'}.contains(ext) ? 'apps' : 'other';
+        categories[category] = categories[category]! + file.size;
+      }
+      return {
+        'categories': categories,
+        'large': files.where((f) => f.size >= 100 * 1024 * 1024).take(200).map((f) => {'p': f.path, 'n': f.name, 'd': false, 's': f.size, 'm': f.mod}).toList(),
+        'recent': files.where((f) => now - f.mod <= 14 * 86400).take(200).map((f) => {'p': f.path, 'n': f.name, 'd': false, 's': f.size, 'm': f.mod}).toList(),
+        'empty': <Map<String, dynamic>>[],
+        'duplicates': <Map<String, dynamic>>[],
+        'trash': <Map<String, dynamic>>[],
+        'folders': <Map<String, dynamic>>[],
+      };
+    }
+    final a = root.toNativeUtf8();
+    final f = l.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>), Pointer<Utf8> Function(Pointer<Utf8>)>('fy_analyze');
+    final s = _take(f(a));
+    malloc.free(a);
+    return jsonDecode(s);
+  }
+
+  static Future<Map<String, dynamic>> analyzeAsync(String root) =>
+      Isolate.run(() => analyze(root));
+
   // FTP (runs on the main isolate; the library is process-global)
   static bool ftpStart(String root, int port, String user, String pass, bool hidden) {
     final l = lib;

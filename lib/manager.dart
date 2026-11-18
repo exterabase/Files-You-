@@ -343,10 +343,13 @@ class _ManagerState extends State<Manager> {
         padding: EdgeInsets.only(bottom: 130 + bottom),
         itemCount: items.length,
         separatorBuilder: (_, i) {
-          if (i + 1 < items.length && items[i].dir != items[i + 1].dir) {
-            return Divider(height: 18 * density, indent: 18, endIndent: 18, thickness: 1);
-          }
-          return SizedBox(height: 2 * density);
+          return Divider(
+            height: 9 * density,
+            thickness: 1,
+            indent: 72 * density,
+            endIndent: 12,
+            color: cs.outlineVariant.withOpacity(.55),
+          );
         },
         itemBuilder: (_, i) {
           final e = items[i];

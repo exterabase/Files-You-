@@ -393,7 +393,13 @@ class HtmlView extends StatefulWidget {
 }
 
 class _HtmlViewState extends State<HtmlView> {
-  late final WebViewController w = WebViewController()..setJavaScriptMode(JavaScriptMode.unrestricted)..loadFile(widget.path);
+  late final WebViewController w = WebViewController()
+    ..setJavaScriptMode(JavaScriptMode.unrestricted)
+    ..setBackgroundColor(Colors.white)
+    ..setNavigationDelegate(NavigationDelegate(
+      onWebResourceError: (_) {},
+    ))
+    ..loadFile(widget.path);
   @override
   Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(base(widget.path), style: const TextStyle(fontSize: 15))), body: WebViewWidget(controller: w));
 }
@@ -403,15 +409,44 @@ Future<void> openInBrowser(String file) async {
   await _srv?.close(force: true);
   final dir = p.dirname(file);
   _srv = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-  const mime = {'html': 'text/html', 'htm': 'text/html', 'css': 'text/css', 'js': 'text/javascript', 'json': 'application/json', 'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'svg': 'image/svg+xml', 'webp': 'image/webp', 'txt': 'text/plain', 'woff2': 'font/woff2', 'ttf': 'font/ttf'};
+  const mime = {
+    'html': 'text/html',
+    'htm': 'text/html',
+    'css': 'text/css',
+    'js': 'text/javascript',
+    'json': 'application/json',
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'svg': 'image/svg+xml',
+    'webp': 'image/webp',
+    'txt': 'text/plain',
+    'woff2': 'font/woff2',
+    'ttf': 'font/ttf',
+  };
   _srv!.listen((r) async {
-    final rel = Uri.decodeComponent(r.uri.path).split('/').where((e) => e.isNotEmpty && e != '..').join('/');
+    r.response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+    final rel = Uri.decodeComponent(r.uri.path)
+        .split('/')
+        .where((e) => e.isNotEmpty && e != '..')
+        .join('/');
     final f = File('$dir/$rel');
     if (await f.exists()) {
-      r.headers.contentType = ContentType.parse('${mime[p.extension(f.path).toLowerCase().replaceFirst('.', '')] ?? 'application/octet-stream'}; charset=utf-8');
+      final ext = p.extension(f.path).toLowerCase().replaceFirst('.', '');
+      final type = mime[ext] ?? 'application/octet-stream';
+      r.response.headers.contentType = type.startsWith('text/')
+          ? ContentType.parse('$type; charset=utf-8')
+          : ContentType.parse(type);
       await r.response.addStream(f.openRead());
-    } else { r.response.statusCode = 404; }
+    } else {
+      r.response.statusCode = HttpStatus.notFound;
+    }
     await r.response.close();
   });
-  await launchUrl(Uri.parse('http://127.0.0.1:${_srv!.port}/${Uri.encodeComponent(p.basename(file))}'), mode: LaunchMode.externalApplication);
+  final name = Uri.encodeComponent(p.basename(file));
+  await launchUrl(
+    Uri.parse('http://127.0.0.1:${_srv!.port}/$name'),
+    mode: LaunchMode.externalApplication,
+  );
 }

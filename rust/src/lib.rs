@@ -8,6 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, UNIX_EPOCH};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 fn cs(p: *const c_char) -> String {
     if p.is_null() { return String::new(); }
@@ -98,6 +101,95 @@ pub extern "C" fn fy_scan(root: *const c_char) -> *mut c_char {
         true
     });
     out(json!({"photo": ph, "audio": au, "video": vi}).to_string())
+}
+
+fn file_fingerprint(p: &Path, size: u64) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    size.hash(&mut hasher);
+    p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default().hash(&mut hasher);
+    if let Ok(mut f) = fs::File::open(p) {
+        let mut buf = [0u8; 1024 * 1024];
+        let len = f.read(&mut buf).unwrap_or(0);
+        buf[..len].hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+#[no_mangle]
+pub extern "C" fn fy_analyze(root: *const c_char) -> *mut c_char {
+    let root = cs(root);
+    let mut photo = 0u64;
+    let mut audio = 0u64;
+    let mut video = 0u64;
+    let mut documents = 0u64;
+    let mut apps = 0u64;
+    let mut other = 0u64;
+    let mut large = Vec::<Value>::new();
+    let mut recent = Vec::<Value>::new();
+    let mut empty = Vec::<Value>::new();
+    let mut trash = Vec::<Value>::new();
+    let mut folders = Vec::<(String, u64, String)>::new();
+    let mut fingerprints = HashMap::<u64, Vec<Value>>::new();
+    let mut now = 0u64;
+    if let Ok(t) = std::time::SystemTime::now().duration_since(UNIX_EPOCH) { now = t.as_secs(); }
+    let mut folder_sums = HashMap::<String, u64>::new();
+
+    walk(&root, false, |p, m| {
+        if m.is_dir() {
+            if let Ok(rd) = fs::read_dir(p) {
+                if rd.count() == 0 {
+                    if let Some(j) = ent(p) { empty.push(j); }
+                }
+            }
+            return true;
+        }
+        if !m.is_file() { return true; }
+        let size = m.len();
+        let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        match ext.as_str() {
+            "jpg"|"jpeg"|"png"|"gif"|"webp"|"heic"|"heif"|"bmp"|"avif" => photo += size,
+            "mp3"|"wav"|"flac"|"m4a"|"ogg"|"aac"|"opus"|"amr"|"wma" => audio += size,
+            "mp4"|"mkv"|"avi"|"mov"|"webm"|"3gp"|"m4v" => video += size,
+            "pdf"|"doc"|"docx"|"xls"|"xlsx"|"ppt"|"pptx"|"txt"|"md"|"odt"|"rtf"|"csv"|"json"|"xml"|"html"|"htm" => documents += size,
+            "apk"|"xapk"|"apks"|"obb"|"aab" => apps += size,
+            _ => other += size,
+        }
+        if size >= 100 * 1024 * 1024 {
+            if let Some(j) = ent(p) { large.push(j); }
+        }
+        let mod_ = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_secs()).unwrap_or(0);
+        if now > mod_ && now - mod_ <= 14 * 86400 {
+            if let Some(j) = ent(p) { recent.push(j); }
+        }
+        let rel = p.strip_prefix(&root).unwrap_or(p).to_string_lossy().replace('\\', "/");
+        if rel.starts_with(".FilesYouTrash/") {
+            if let Some(j) = ent(p) { trash.push(j); }
+        }
+        let top = rel.split('/').next().unwrap_or("").to_string();
+        if !top.is_empty() { *folder_sums.entry(top).or_insert(0) += size; }
+        if size > 0 {
+            let fp = file_fingerprint(p, size);
+            if let Some(j) = ent(p) { fingerprints.entry(fp).or_default().push(j); }
+        }
+        true
+    });
+
+    large.sort_by(|a,b| b["s"].as_u64().unwrap_or(0).cmp(&a["s"].as_u64().unwrap_or(0)));
+    recent.sort_by(|a,b| b["m"].as_u64().unwrap_or(0).cmp(&a["m"].as_u64().unwrap_or(0)));
+    for (name, size) in folder_sums { folders.push((name, size, format!("{size}"))); }
+    folders.sort_by(|a,b| b.1.cmp(&a.1));
+    let folder_json: Vec<Value> = folders.into_iter().take(40).map(|(name,size,_)| json!({"name":name,"size":size})).collect();
+    let duplicates: Vec<Value> = fingerprints.into_values().filter(|v| v.len() > 1).take(100).map(|v| json!({"files":v})).collect();
+    let categories = json!({"photo":photo,"audio":audio,"video":video,"documents":documents,"apps":apps,"other":other});
+    out(json!({
+        "categories":categories,
+        "large":large.into_iter().take(200).collect::<Vec<_>>(),
+        "recent":recent.into_iter().take(200).collect::<Vec<_>>(),
+        "empty":empty.into_iter().take(200).collect::<Vec<_>>(),
+        "duplicates":duplicates,
+        "trash":trash.into_iter().take(200).collect::<Vec<_>>(),
+        "folders":folder_json
+    }).to_string())
 }
 
 // ---------------- minimal FTP server ----------------
